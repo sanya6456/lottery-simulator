@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { WsGateway } from './ws.gateway';
 import { Logger } from '@nestjs/common';
 
-const mockClient = { id: 'test-client-id' };
+const mockClient = { id: 'test-client-id', join: jest.fn(), leave: jest.fn() };
 
 describe('WsGateway', () => {
   let gateway: WsGateway;
@@ -43,22 +43,25 @@ describe('WsGateway', () => {
     });
   });
 
-  describe('handleMessage', () => {
-    it('should log and return the received data', () => {
-      const data = { text: 'hello' };
+  describe('handleJoin', () => {
+    it('should join room and log', () => {
+      gateway.handleJoin({ sessionId: 'session-1' }, mockClient as never);
 
-      const result = gateway.handleMessage(data, mockClient as never);
-
+      expect(mockClient.join).toHaveBeenCalledWith('session-1');
       expect(logSpy).toHaveBeenCalledWith(
-        `Message from ${mockClient.id}: ${JSON.stringify(data)}`,
+        `Client ${mockClient.id} joined session session-1`,
       );
-      expect(result).toBe(data);
     });
+  });
 
-    it('should handle primitive data', () => {
-      const result = gateway.handleMessage('ping', mockClient as never);
+  describe('handleLeave', () => {
+    it('should leave room and log', () => {
+      gateway.handleLeave({ sessionId: 'session-1' }, mockClient as never);
 
-      expect(result).toBe('ping');
+      expect(mockClient.leave).toHaveBeenCalledWith('session-1');
+      expect(logSpy).toHaveBeenCalledWith(
+        `Client ${mockClient.id} left session session-1`,
+      );
     });
   });
 });
