@@ -1,78 +1,129 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  Inject,
+} from '@nestjs/common';
 import { randomInt } from 'crypto';
+import Redis from 'ioredis';
 import { WsGateway } from '../lib/websocket/ws.gateway';
 import { SessionStatus } from '../lib/entities/session.entity';
 import { SessionsService } from '../session/sessions.service';
+import { REDIS_CLIENT, REDIS_SUBSCRIBER } from '../lib/modules/redis.module';
 import { DrawResult, DrawStats, WinCounts } from './simulation.types';
 
 const DRAWS_PER_YEAR = 52;
 const MAX_YEARS = 500;
 const MAX_DRAWS = DRAWS_PER_YEAR * MAX_YEARS; // 26 000
 const TICKET_PRICE = 300;
+const CONTROL_CHANNEL = 'session:control';
+
+type ControlMessage =
+  | { type: 'stop'; sessionId: string }
+  | { type: 'speed'; sessionId: string; speedMs: number };
 
 @Injectable()
-export class SimulationService {
+export class SimulationService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SimulationService.name);
 
-  /** sessionId → interval handle */
+  /** sessionId → interval handle (local to this instance) */
   private readonly loops = new Map<string, NodeJS.Timeout>();
-
-  /** sessionId → running win counters (kept in memory for perf) */
-  private readonly winCounts = new Map<string, WinCounts>();
 
   constructor(
     private readonly sessionsService: SessionsService,
     private readonly wsGateway: WsGateway,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    @Inject(REDIS_SUBSCRIBER) private readonly subscriber: Redis,
   ) {}
+
+  onModuleInit() {
+    void this.subscriber.subscribe(CONTROL_CHANNEL);
+    this.subscriber.on('message', (_channel: string, raw: string) => {
+      const msg = JSON.parse(raw) as ControlMessage;
+      if (!this.loops.has(msg.sessionId)) return;
+      if (msg.type === 'stop') {
+        this.stopLocal(msg.sessionId);
+      } else if (msg.type === 'speed') {
+        this.restartLoop(msg.sessionId, msg.speedMs);
+      }
+    });
+  }
+
+  onModuleDestroy() {
+    for (const sessionId of this.loops.keys()) {
+      this.stopLocal(sessionId);
+    }
+  }
 
   async start(sessionId: string): Promise<void> {
     if (this.loops.has(sessionId)) return;
 
     const session = await this.sessionsService.findOneOrFail(sessionId);
-    this.winCounts.set(sessionId, { two: 0, three: 0, four: 0, five: 0 });
+    await this.redis.hset(winKey(sessionId), {
+      two: 0,
+      three: 0,
+      four: 0,
+      five: 0,
+    });
 
+    this.startLoop(sessionId, session.speedMs);
+    this.logger.log(`Simulation started for session ${sessionId}`);
+  }
+
+  stop(sessionId: string): void {
+    void this.redis.publish(
+      CONTROL_CHANNEL,
+      JSON.stringify({ type: 'stop', sessionId }),
+    );
+  }
+
+  updateSpeed(sessionId: string, speedMs: number): void {
+    void this.redis.publish(
+      CONTROL_CHANNEL,
+      JSON.stringify({ type: 'speed', sessionId, speedMs }),
+    );
+  }
+
+  private startLoop(sessionId: string, speedMs: number): void {
     const tick = async () => {
       try {
         await this.runDraw(sessionId);
       } catch (err) {
         this.logger.error(`Draw error for session ${sessionId}`, err);
-        this.stop(sessionId);
+        this.stopLocal(sessionId);
       }
     };
-
-    const handle = setInterval(() => void tick(), session.speedMs);
+    const handle = setInterval(() => void tick(), speedMs);
     this.loops.set(sessionId, handle);
-    this.logger.log(`Simulation started for session ${sessionId}`);
   }
 
-  stop(sessionId: string): void {
+  private stopLocal(sessionId: string): void {
     const handle = this.loops.get(sessionId);
     if (handle) {
       clearInterval(handle);
       this.loops.delete(sessionId);
-      this.winCounts.delete(sessionId);
+      void this.redis.del(winKey(sessionId));
       this.logger.log(`Simulation stopped for session ${sessionId}`);
     }
   }
 
-  updateSpeed(sessionId: string, speedMs: number): void {
+  private restartLoop(sessionId: string, speedMs: number): void {
     const handle = this.loops.get(sessionId);
     if (!handle) return;
-
     clearInterval(handle);
-    const tick = async () => {
-      try {
-        await this.runDraw(sessionId);
-      } catch {
-        this.stop(sessionId);
-      }
-    };
-    const newHandle = setInterval(() => void tick(), speedMs);
-    this.loops.set(sessionId, newHandle);
+    this.startLoop(sessionId, speedMs);
   }
 
   private async runDraw(sessionId: string): Promise<void> {
     const session = await this.sessionsService.findOneOrFail(sessionId);
+
+    // Guard: stop if session was ended externally (e.g. DELETE hit a different instance)
+    if (session.status !== SessionStatus.RUNNING) {
+      this.stopLocal(sessionId);
+      return;
+    }
+
     const drawNumber = session.totalDraws + 1;
 
     const playerNumbers = session.useRandomNumbers
@@ -92,15 +143,11 @@ export class SimulationService {
         drawnNumbers,
         hits,
       });
-
-      const wins = this.winCounts.get(sessionId)!;
-      incrementWin(wins, hits);
+      await incrementWinInRedis(this.redis, sessionId, hits);
     }
 
-    const stats: DrawStats = buildStats(
-      drawNumber,
-      this.winCounts.get(sessionId)!,
-    );
+    const wins = await getWinsFromRedis(this.redis, sessionId);
+    const stats: DrawStats = buildStats(drawNumber, wins);
     const result: DrawResult = {
       sessionId,
       drawNumber,
@@ -116,7 +163,7 @@ export class SimulationService {
     const isExpired = drawNumber >= MAX_DRAWS;
 
     if (isJackpot || isExpired) {
-      this.stop(sessionId);
+      this.stopLocal(sessionId);
       const endStatus = isJackpot
         ? SessionStatus.JACKPOT
         : SessionStatus.EXPIRED;
@@ -127,6 +174,33 @@ export class SimulationService {
       });
     }
   }
+}
+
+function winKey(sessionId: string): string {
+  return `winCounts:${sessionId}`;
+}
+
+async function incrementWinInRedis(
+  redis: Redis,
+  sessionId: string,
+  hits: number,
+): Promise<void> {
+  const field =
+    hits === 2 ? 'two' : hits === 3 ? 'three' : hits === 4 ? 'four' : 'five';
+  await redis.hincrby(winKey(sessionId), field, 1);
+}
+
+async function getWinsFromRedis(
+  redis: Redis,
+  sessionId: string,
+): Promise<WinCounts> {
+  const data = await redis.hgetall(winKey(sessionId));
+  return {
+    two: parseInt(data.two ?? '0', 10),
+    three: parseInt(data.three ?? '0', 10),
+    four: parseInt(data.four ?? '0', 10),
+    five: parseInt(data.five ?? '0', 10),
+  };
 }
 
 function drawUniqueNumbers(): number[] {
@@ -140,13 +214,6 @@ function drawUniqueNumbers(): number[] {
 function countHits(playerNumbers: number[], drawnNumbers: number[]): number {
   const drawn = new Set(drawnNumbers);
   return playerNumbers.filter((n) => drawn.has(n)).length;
-}
-
-function incrementWin(wins: WinCounts, hits: number): void {
-  if (hits === 2) wins.two++;
-  else if (hits === 3) wins.three++;
-  else if (hits === 4) wins.four++;
-  else if (hits === 5) wins.five++;
 }
 
 function buildStats(totalDraws: number, wins: WinCounts): DrawStats {
