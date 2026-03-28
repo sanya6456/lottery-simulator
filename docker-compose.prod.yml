@@ -1,0 +1,18 @@
+services:
+  backend:
+    build:
+      target: production
+    volumes: []
+    restart: always
+
+  frontend:
+    build:
+      target: production
+    ports:
+      - "80:80"
+    volumes: []
+    restart: always
+
+  pgadmin:
+    profiles:
+      - tools
