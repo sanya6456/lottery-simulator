@@ -18,7 +18,7 @@ type WsClient = {
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.FRONTEND_URL,
+    origin: '*',
   },
 })
 export class WsGateway

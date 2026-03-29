@@ -3,7 +3,7 @@ import { cn } from "../../lib/utils/cn";
 
 const ButtonVariant = {
   primary:
-    "rounded-md px-2 py-1.5 bg-primary text-white font-semibold cursor-pointer hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-primary-disabled disabled:text-gray-300",
+    "rounded-md px-2 py-1.5 bg-primary text-white font-semibold cursor-pointer hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-primary-disabled",
 } as const;
 
 type TButtonProps = {

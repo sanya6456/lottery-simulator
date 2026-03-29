@@ -1,21 +1,21 @@
 type TWinStatisticsProps = {
-  twoWinsCount?: number;
-  threeWinsCount?: number;
-  fourWinsCount?: number;
-  fiveWinsCount?: number;
+  two?: number;
+  three?: number;
+  four?: number;
+  five?: number;
 };
 
 export default function WinStatistics({
-  twoWinsCount = 0,
-  threeWinsCount = 0,
-  fourWinsCount = 0,
-  fiveWinsCount = 0,
+  two = 0,
+  three = 0,
+  four = 0,
+  five = 0,
 }: TWinStatisticsProps) {
   const WINS_DATA = [
-    { label: "2 matches", count: twoWinsCount },
-    { label: "3 matches", count: threeWinsCount },
-    { label: "4 matches", count: fourWinsCount },
-    { label: "5 matches", count: fiveWinsCount },
+    { label: "2 matches", count: two },
+    { label: "3 matches", count: three },
+    { label: "4 matches", count: four },
+    { label: "5 matches", count: five },
   ];
 
   return (

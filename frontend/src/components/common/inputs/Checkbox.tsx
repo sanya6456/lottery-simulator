@@ -6,6 +6,7 @@ type TCheckboxProps = {
   checked?: boolean;
   onChange?: (checked: boolean) => void;
   size?: TCheckboxSize;
+  disabled?: boolean;
 };
 
 const sizeStyles: Record<TCheckboxSize, { box: string; icon: string }> = {
@@ -19,11 +20,13 @@ export default function Checkbox({
   checked = false,
   onChange,
   size = "md",
+  disabled = false,
 }: TCheckboxProps) {
   const { box, icon } = sizeStyles[size];
 
   return (
     <button
+      disabled={disabled}
       type="button"
       role="checkbox"
       aria-checked={checked}

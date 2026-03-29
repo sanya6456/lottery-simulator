@@ -1,15 +1,51 @@
-import { useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { useForm } from "@tanstack/react-form";
 import Checkbox from "./common/inputs/Checkbox";
 import RangeInput from "./common/inputs/range-input/RangeInput";
 import LotteryNumbersPicker from "./lottery-numbers-picker/LotteryNumbersPicker";
 import Button from "./common/Button";
 import { useCreateSession, useUpdateSpeed } from "../lib/api/sessions";
+import {
+  useSessionSocket,
+  type DrawResult,
+  type SessionEndedPayload,
+} from "../lib/socket/useSessionSocket";
 
-export default function LotterySimulationForm() {
+type TLotterySimulationFormProps = {
+  latestDraw: DrawResult | null;
+  setLatestDraw: Dispatch<SetStateAction<DrawResult | null>>;
+};
+
+export default function LotterySimulationForm({
+  latestDraw,
+  setLatestDraw,
+}: TLotterySimulationFormProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const createSession = useCreateSession();
   const updateSpeed = useUpdateSpeed();
+
+  const handleDraw = useCallback(
+    (result: DrawResult) => {
+      setLatestDraw(result);
+    },
+    [setLatestDraw],
+  );
+
+  const handleSessionEnded = useCallback((payload: SessionEndedPayload) => {
+    console.log("Session ended:", payload.reason, payload.stats);
+  }, []);
+
+  const { isConnected: isWSConnected } = useSessionSocket(sessionId, {
+    onDraw: handleDraw,
+    onSessionEnded: handleSessionEnded,
+  });
 
   const form = useForm({
     defaultValues: {
@@ -38,6 +74,16 @@ export default function LotterySimulationForm() {
     },
   });
 
+  const handleLatestDrawChange = useEffectEvent(() => {
+    if (!latestDraw) return;
+
+    form.setFieldValue("winningNumbers", latestDraw.drawnNumbers);
+  });
+
+  useEffect(() => {
+    void handleLatestDrawChange();
+  }, [latestDraw]);
+
   return (
     <form
       className="grid grid-cols-[max-content_1fr] gap-4 max-w-98.5 w-full"
@@ -63,6 +109,7 @@ export default function LotterySimulationForm() {
             label="Your numbers:"
             value={field.state.value}
             onChange={field.handleChange}
+            readonly={createSession.isPending || isWSConnected}
           />
         )}
       </form.Field>
@@ -72,7 +119,7 @@ export default function LotterySimulationForm() {
       </p>
       <form.Field name="playWithRandomNumbers">
         {(field) => (
-          <Checkbox checked={field.state.value} onChange={field.handleChange} />
+          <Checkbox disabled={createSession.isPending || isWSConnected} checked={field.state.value} onChange={field.handleChange} />
         )}
       </form.Field>
 
@@ -98,8 +145,12 @@ export default function LotterySimulationForm() {
         )}
       </form.Field>
 
-      <Button className="mt-4" type="submit" disabled={createSession.isPending}>
-        {createSession.isPending ? "Starting..." : "Start simulation"}
+      <Button
+        className="mt-4"
+        type="submit"
+        disabled={createSession.isPending || isWSConnected}
+      >
+        {(createSession.isPending || isWSConnected) ? "Running..." : "Start simulation"}
       </Button>
     </form>
   );
