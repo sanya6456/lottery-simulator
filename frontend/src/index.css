@@ -1,5 +1,5 @@
-@import "tailwindcss";
 @import url("https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..900;1,200..900&display=swap");
+@import "tailwindcss";
 
 @theme {
   --color-primary: #a5d9c8;
@@ -11,4 +11,8 @@
   html {
     font-family: var(--font-sans);
   }
+}
+
+@utility drop-shadow-md {
+  box-shadow: 1px 1px 6px 0px #00000026;
 }

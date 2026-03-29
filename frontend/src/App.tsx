@@ -1,7 +1,10 @@
 import Card from "./components/card/Card";
-import GeneralInfo from "./components/general-info/GeneralInfo";
+import GeneralInfo from "./components/GeneralInfo";
 import Header from "./components/header/Header";
-import Heading from "./components/heading/Heading";
+import Heading from "./components/common/Heading";
+import Spacing from "./components/common/Spacing";
+import WinStatistics from "./components/WinStatistics";
+import LotterySimulationForm from "./components/LotterySimulationForm";
 
 function App() {
   return (
@@ -13,6 +16,10 @@ function App() {
             Result
           </Heading>
           <GeneralInfo />
+          <Spacing size="lg" />
+          <WinStatistics />
+          <Spacing size="lg" />
+          <LotterySimulationForm />
         </Card>
       </main>
     </>
