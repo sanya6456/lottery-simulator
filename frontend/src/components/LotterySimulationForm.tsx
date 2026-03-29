@@ -1,19 +1,40 @@
+import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import Checkbox from "./common/inputs/Checkbox";
 import RangeInput from "./common/inputs/range-input/RangeInput";
 import LotteryNumbersPicker from "./lottery-numbers-picker/LotteryNumbersPicker";
 import Button from "./common/Button";
+import { useCreateSession, useUpdateSpeed } from "../lib/api/sessions";
 
 export default function LotterySimulationForm() {
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const createSession = useCreateSession();
+  const updateSpeed = useUpdateSpeed();
+
   const form = useForm({
     defaultValues: {
-      winningNumbers: Array(5).fill(null),
-      yourNumbers: Array(5).fill(null),
+      winningNumbers: Array(5).fill(null) as (number | null)[],
+      yourNumbers: Array(5).fill(null) as (number | null)[],
       playWithRandomNumbers: false,
-      speed: 10,
+      speed: 500,
     },
-    onSubmit: ({ value }) => {
-      console.log(value);
+    onSubmit: async ({ value }) => {
+      const playerNumbers = value.yourNumbers.filter(
+        (n): n is number => n !== null,
+      );
+
+      await createSession.mutateAsync(
+        {
+          useRandomNumbers: value.playWithRandomNumbers,
+          playerNumbers: value.playWithRandomNumbers
+            ? undefined
+            : playerNumbers,
+          speedMs: value.speed,
+        },
+        {
+          onSuccess: (session) => setSessionId(session.id),
+        },
+      );
     },
   });
 
@@ -66,13 +87,19 @@ export default function LotterySimulationForm() {
             step={10}
             value={field.state.value}
             onChange={field.handleChange}
-            onChangeCommitted={() => form.handleSubmit()}
+            onChangeCommitted={(speedMs) => {
+              if (sessionId) {
+                updateSpeed.mutate({ id: sessionId, speedMs });
+              } else {
+                form.handleSubmit();
+              }
+            }}
           />
         )}
       </form.Field>
 
-      <Button className="mt-4" type="submit">
-        Start simulation
+      <Button className="mt-4" type="submit" disabled={createSession.isPending}>
+        {createSession.isPending ? "Starting..." : "Start simulation"}
       </Button>
     </form>
   );
