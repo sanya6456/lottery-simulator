@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { socket } from "./socket";
 
+const joinedSessions = new Set<string>();
+
 export type DrawResult = {
   sessionId: string;
   drawNumber: number;
@@ -39,16 +41,6 @@ export function useSessionSocket(
   { onDraw, onSessionEnded }: UseSessionSocketOptions = {},
 ) {
   const [isConnected, setIsConnected] = useState(socket.connected);
-
-  (
-    useSessionSocket as unknown as { _joinedSessions?: Set<string> }
-  )._joinedSessions =
-    (useSessionSocket as unknown as { _joinedSessions?: Set<string> })
-      ._joinedSessions || new Set<string>();
-
-  const joinedSessions: Set<string> = (
-    useSessionSocket as unknown as { _joinedSessions?: Set<string> }
-  )._joinedSessions as Set<string>;
 
   useEffect(() => {
     if (!sessionId) return;
@@ -95,7 +87,7 @@ export function useSessionSocket(
       if (onDraw) socket.off("draw:result", onDraw);
       if (onSessionEnded) socket.off("session:ended", onSessionEnded);
     };
-  }, [sessionId, onDraw, onSessionEnded, joinedSessions]);
+  }, [sessionId, onDraw, onSessionEnded]);
 
   return { isConnected };
 }
