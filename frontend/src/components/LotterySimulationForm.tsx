@@ -141,10 +141,8 @@ export default function LotterySimulationForm({
             value={field.state.value}
             onChange={field.handleChange}
             onChangeCommitted={(speedMs) => {
-              if (sessionId) {
+              if (sessionId && isRunning) {
                 updateSpeed.mutate({ id: sessionId, speedMs });
-              } else {
-                form.handleSubmit();
               }
             }}
           />

@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { socket } from "./socket";
 
-const joinedSessions = new Set<string>();
-
 export type DrawResult = {
   sessionId: string;
   drawNumber: number;
@@ -36,6 +34,13 @@ type UseSessionSocketOptions = {
   onSessionEnded?: (payload: SessionEndedPayload) => void;
 };
 
+const SESSION_JOIN_EVENT = "session:join";
+const SESSION_DRAW_RESULT_EVENT = "draw:result";
+const SESSION_LEAVE_EVENT = "session:leave";
+const SESSION_ENDED_EVENT = "session:ended";
+
+const joinedSessions = new Set<string>();
+
 export function useSessionSocket(
   sessionId: string | null,
   { onDraw, onSessionEnded }: UseSessionSocketOptions = {},
@@ -52,7 +57,7 @@ export function useSessionSocket(
     const handleConnect = () => {
       setIsConnected(true);
       if (sessionId && !joinedSessions.has(sessionId)) {
-        socket.emit("session:join", { sessionId });
+        socket.emit(SESSION_JOIN_EVENT, { sessionId });
         joinedSessions.add(sessionId);
       }
     };
@@ -60,7 +65,7 @@ export function useSessionSocket(
     const handleDisconnect = () => setIsConnected(false);
 
     if (socket.connected && sessionId && !joinedSessions.has(sessionId)) {
-      socket.emit("session:join", { sessionId });
+      socket.emit(SESSION_JOIN_EVENT, { sessionId });
       joinedSessions.add(sessionId);
     }
 
@@ -68,24 +73,24 @@ export function useSessionSocket(
     socket.on("disconnect", handleDisconnect);
 
     if (onDraw) {
-      socket.off("draw:result", onDraw);
-      socket.on("draw:result", onDraw);
+      socket.off(SESSION_DRAW_RESULT_EVENT, onDraw);
+      socket.on(SESSION_DRAW_RESULT_EVENT, onDraw);
     }
     if (onSessionEnded) {
-      socket.off("session:ended", onSessionEnded);
-      socket.on("session:ended", onSessionEnded);
+      socket.off(SESSION_ENDED_EVENT, onSessionEnded);
+      socket.on(SESSION_ENDED_EVENT, onSessionEnded);
     }
 
     return () => {
       if (sessionId && joinedSessions.has(sessionId)) {
-        socket.emit("session:leave", { sessionId });
+        socket.emit(SESSION_LEAVE_EVENT, { sessionId });
         joinedSessions.delete(sessionId);
       }
 
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
-      if (onDraw) socket.off("draw:result", onDraw);
-      if (onSessionEnded) socket.off("session:ended", onSessionEnded);
+      if (onDraw) socket.off(SESSION_DRAW_RESULT_EVENT, onDraw);
+      if (onSessionEnded) socket.off(SESSION_ENDED_EVENT, onSessionEnded);
     };
   }, [sessionId, onDraw, onSessionEnded]);
 
