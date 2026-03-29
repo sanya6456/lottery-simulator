@@ -57,6 +57,15 @@ export class SimulationService implements OnModuleInit, OnModuleDestroy {
   }
 
   async start(sessionId: string): Promise<void> {
+    const lockKey = `session:loop:${sessionId}`;
+    const lockResult = await this.redis.set(lockKey, '1', 'EX', 60 * 60, 'NX');
+    if (lockResult === null) {
+      this.logger.log(
+        `Loop for session ${sessionId} already running on another instance`,
+      );
+      return;
+    }
+
     if (this.loops.has(sessionId)) return;
 
     const session = await this.sessionsService.findOneOrFail(sessionId);
@@ -104,6 +113,7 @@ export class SimulationService implements OnModuleInit, OnModuleDestroy {
       clearInterval(handle);
       this.loops.delete(sessionId);
       void this.redis.del(winKey(sessionId));
+      void this.redis.del(`session:loop:${sessionId}`);
       this.logger.log(`Simulation stopped for session ${sessionId}`);
     }
   }

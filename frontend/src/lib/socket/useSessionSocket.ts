@@ -40,6 +40,16 @@ export function useSessionSocket(
 ) {
   const [isConnected, setIsConnected] = useState(socket.connected);
 
+  (
+    useSessionSocket as unknown as { _joinedSessions?: Set<string> }
+  )._joinedSessions =
+    (useSessionSocket as unknown as { _joinedSessions?: Set<string> })
+      ._joinedSessions || new Set<string>();
+
+  const joinedSessions: Set<string> = (
+    useSessionSocket as unknown as { _joinedSessions?: Set<string> }
+  )._joinedSessions as Set<string>;
+
   useEffect(() => {
     if (!sessionId) return;
 
@@ -49,28 +59,43 @@ export function useSessionSocket(
 
     const handleConnect = () => {
       setIsConnected(true);
-      socket.emit("session:join", { sessionId });
+      if (sessionId && !joinedSessions.has(sessionId)) {
+        socket.emit("session:join", { sessionId });
+        joinedSessions.add(sessionId);
+      }
     };
 
     const handleDisconnect = () => setIsConnected(false);
 
-    if (socket.connected) {
+    if (socket.connected && sessionId && !joinedSessions.has(sessionId)) {
       socket.emit("session:join", { sessionId });
+      joinedSessions.add(sessionId);
     }
 
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
-    if (onDraw) socket.on("draw:result", onDraw);
-    if (onSessionEnded) socket.on("session:ended", onSessionEnded);
+
+    if (onDraw) {
+      socket.off("draw:result", onDraw);
+      socket.on("draw:result", onDraw);
+    }
+    if (onSessionEnded) {
+      socket.off("session:ended", onSessionEnded);
+      socket.on("session:ended", onSessionEnded);
+    }
 
     return () => {
-      socket.emit("session:leave", { sessionId });
+      if (sessionId && joinedSessions.has(sessionId)) {
+        socket.emit("session:leave", { sessionId });
+        joinedSessions.delete(sessionId);
+      }
+
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
       if (onDraw) socket.off("draw:result", onDraw);
       if (onSessionEnded) socket.off("session:ended", onSessionEnded);
     };
-  }, [sessionId, onDraw, onSessionEnded]);
+  }, [sessionId, onDraw, onSessionEnded, joinedSessions]);
 
   return { isConnected };
 }
