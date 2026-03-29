@@ -16,6 +16,7 @@ import {
   useSessionSocket,
   type DrawResult,
 } from "../lib/socket/useSessionSocket";
+import Spacing from "./common/Spacing";
 
 type TLotterySimulationFormProps = {
   latestDraw: DrawResult | null;
@@ -88,67 +89,75 @@ export default function LotterySimulationForm({
 
   return (
     <form
-      className="grid grid-cols-[max-content_1fr] gap-4 max-w-98.5 w-full"
       onSubmit={(e) => {
         e.preventDefault();
         form.handleSubmit();
       }}
     >
-      <form.Field name="winningNumbers">
-        {(field) => (
-          <LotteryNumbersPicker
-            label="Winning numbers:"
-            value={field.state.value}
-            onChange={field.handleChange}
-            readonly
-          />
-        )}
-      </form.Field>
+      <div className="grid grid-cols-[max-content_1fr] gap-4 max-w-98.5 w-full lg:gap-y-6">
+        <form.Field name="winningNumbers">
+          {(field) => (
+            <LotteryNumbersPicker
+              label="Winning numbers:"
+              value={field.state.value}
+              onChange={field.handleChange}
+              readonly
+            />
+          )}
+        </form.Field>
 
-      <form.Field name="yourNumbers">
-        {(field) => (
-          <LotteryNumbersPicker
-            label="Your numbers:"
-            value={field.state.value}
-            onChange={field.handleChange}
-            readonly={createSession.isPending || isRunning}
-          />
-        )}
-      </form.Field>
+        <form.Field name="yourNumbers">
+          {(field) => (
+            <LotteryNumbersPicker
+              label="Your numbers:"
+              value={field.state.value}
+              onChange={field.handleChange}
+              readonly={createSession.isPending || isRunning}
+            />
+          )}
+        </form.Field>
+      </div>
 
-      <p className="my-auto font-bold text-xs lg:text-sm lg:font-normal">
-        Play with random numbers:
-      </p>
-      <form.Field name="playWithRandomNumbers">
-        {(field) => (
-          <Checkbox
-            disabled={createSession.isPending || isRunning}
-            checked={field.state.value}
-            onChange={field.handleChange}
-          />
-        )}
-      </form.Field>
+      <Spacing size="md" />
 
-      <p className="my-auto font-bold text-xs lg:text-sm lg:font-normal">
+      <div className="flex gap-4">
+        <p className="my-auto font-bold text-xs lg:text-sm lg:font-normal">
+          Play with random numbers:
+        </p>
+        <form.Field name="playWithRandomNumbers">
+          {(field) => (
+            <Checkbox
+              disabled={createSession.isPending || isRunning}
+              checked={field.state.value}
+              onChange={field.handleChange}
+            />
+          )}
+        </form.Field>
+      </div>
+
+      <Spacing size="md" />
+
+      <label className="my-auto font-bold text-xs lg:text-sm lg:font-normal">
         Speed:
-      </p>
-      <form.Field name="speed">
-        {(field) => (
-          <RangeInput
-            min={10}
-            max={1000}
-            step={10}
-            value={field.state.value}
-            onChange={field.handleChange}
-            onChangeCommitted={(speedMs) => {
-              if (sessionId && isRunning) {
-                updateSpeed.mutate({ id: sessionId, speedMs });
-              }
-            }}
-          />
-        )}
-      </form.Field>
-
+        <Spacing size="md" />
+        <form.Field name="speed">
+          {(field) => (
+            <RangeInput
+              min={10}
+              max={1000}
+              step={10}
+              value={field.state.value}
+              onChange={field.handleChange}
+              onChangeCommitted={(speedMs) => {
+                if (sessionId && isRunning) {
+                  updateSpeed.mutate({ id: sessionId, speedMs });
+                }
+              }}
+            />
+          )}
+        </form.Field>
+      </label>
+      <Spacing size="lg" />
       <Button className="mt-4" type="submit" disabled={isRunning}>
         {isRunning ? "Running..." : "Start simulation"}
       </Button>
