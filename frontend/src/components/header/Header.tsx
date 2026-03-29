@@ -1,5 +1,5 @@
 import PlusIcon from "../../icons/PlusIcon";
-import Heading from "../heading/Heading";
+import Heading from "../common/Heading";
 import "./header.css";
 
 export default function Header() {
