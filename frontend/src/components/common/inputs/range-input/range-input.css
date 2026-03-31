@@ -1,43 +1,12 @@
+@reference "tailwindcss";
+
 @layer components {
-  .range-input {
-    -webkit-appearance: none;
-    appearance: none;
-    height: 9px;
-    background: transparent;
-    outline: none;
-    cursor: pointer;
-  }
-
-  .range-input::-webkit-slider-runnable-track {
-    background: transparent;
-    height: 9px;
-  }
-
-  .range-input::-moz-range-track {
-    background: transparent;
-    height: 9px;
-  }
-
   .range-input::-webkit-slider-thumb {
+    @apply bg-white w-1.75 h-1.75 rounded-full mt-px appearance-none cursor-grab -ml-1;
     -webkit-appearance: none;
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    border-radius: 9999px;
-    background: white;
-    border: 2px solid #e5e7eb;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
-    cursor: pointer;
-    margin-top: -4.5px;
   }
 
   .range-input::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    border-radius: 9999px;
-    background: white;
-    border: 2px solid #e5e7eb;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
-    cursor: pointer;
+    @apply bg-white w-1.75 h-1.75 rounded-full mt-px appearance-none cursor-grab -ml-1;
   }
 }

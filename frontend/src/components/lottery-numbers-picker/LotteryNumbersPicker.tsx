@@ -1,5 +1,6 @@
 import { useState } from "react";
 import LotteryNumbersInput from "./LotteryNumbersInput";
+import { Typography } from "../common/Typography";
 
 const DEFAULT_VALUES: (number | null)[] = Array(5).fill(null);
 
@@ -8,13 +9,16 @@ type TLotteryNumbersPickerProps = {
   value?: (number | null)[];
   onChange?: (values: (number | null)[]) => void;
   readonly?: boolean;
+  isValid?: boolean;
+  errorMessage?: string;
 };
 
 export default function LotteryNumbersPicker({
   label,
   value: controlledValue,
   onChange,
-  readonly = false,
+  isValid = true,
+  ...restProps
 }: TLotteryNumbersPickerProps) {
   const [internalValues, setInternalValues] =
     useState<(number | null)[]>(DEFAULT_VALUES);
@@ -30,14 +34,16 @@ export default function LotteryNumbersPicker({
   return (
     <>
       {label && (
-        <p className="my-auto font-bold text-xs lg:text-sm lg:font-normal">
+        <Typography className="my-auto" as="label" htmlFor={label}>
           {label}
-        </p>
+        </Typography>
       )}
       <LotteryNumbersInput
+        id={label}
         values={values}
         onChange={handleChange}
-        readonly={readonly}
+        isValid={isValid}
+        {...restProps}
       />
     </>
   );

@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { cn } from "../../lib/utils/cn";
+import { Typography } from "../common/Typography";
 
 const LOTTERY_COUNT = 5;
 const MIN_NUMBER = 1;
@@ -10,31 +11,20 @@ type TLotteryNumbersInputProps = {
   values: (number | null)[];
   onChange: (values: (number | null)[]) => void;
   readonly?: boolean;
+  id?: string;
+  isValid?: boolean;
+  errorMessage?: string;
 };
-
-function getDuplicateIndices(values: (number | null)[]): Set<number> {
-  const seen = new Map<number, number>();
-  const duplicates = new Set<number>();
-  values.forEach((v, i) => {
-    if (v === null) return;
-    if (seen.has(v)) {
-      duplicates.add(seen.get(v)!);
-      duplicates.add(i);
-    } else {
-      seen.set(v, i);
-    }
-  });
-  return duplicates;
-}
 
 export default function LotteryNumbersInput({
   values,
   onChange,
   readonly,
+  id,
+  isValid = true,
+  errorMessage,
 }: TLotteryNumbersInputProps) {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const duplicateIndices = getDuplicateIndices(values);
-  const hasDuplicates = duplicateIndices.size > 0;
 
   const handleChange = (index: number, raw: string) => {
     const digits = raw.replace(/\D/g, "").slice(0, MAX_DIGITS);
@@ -49,7 +39,7 @@ export default function LotteryNumbersInput({
 
     onChange(next);
 
-    if (digits.length >= MAX_DIGITS && !getDuplicateIndices(next).has(index)) {
+    if (digits.length >= MAX_DIGITS && isValid) {
       inputRefs.current[index + 1]?.focus();
     }
   };
@@ -59,6 +49,7 @@ export default function LotteryNumbersInput({
       <div className="flex gap-2 lg:gap-4">
         {Array.from({ length: LOTTERY_COUNT }, (_, index) => (
           <input
+            id={index === 0 ? id : undefined}
             readOnly={readonly}
             key={index}
             ref={(el) => {
@@ -71,7 +62,7 @@ export default function LotteryNumbersInput({
             onChange={(e) => handleChange(index, e.target.value)}
             className={cn(
               "drop-shadow-md w-5.5 h-6.25 text-center font-semibold text-sm rounded-[5px] focus:outline-none border lg:w-8.5 lg:h-9.5 lg:rounded-[10px]",
-              duplicateIndices.has(index)
+              !isValid
                 ? "border-red-500 text-red-500 focus:border-red-500"
                 : "border-[#CDEBF2]",
               readonly && "cursor-default",
@@ -79,10 +70,13 @@ export default function LotteryNumbersInput({
           />
         ))}
       </div>
-      {hasDuplicates && (
-        <p className="text-red-500 text-xs font-semibold absolute -bottom-6">
-          Each number must be unique.
-        </p>
+      {!isValid && (
+        <Typography
+          as="em"
+          className="text-red-500 absolute -bottom-5 lg:text-xs"
+        >
+          {errorMessage}
+        </Typography>
       )}
     </div>
   );

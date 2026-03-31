@@ -17,6 +17,9 @@ import {
   type DrawResult,
 } from "../lib/socket/useSessionSocket";
 import Spacing from "./common/Spacing";
+import { Typography } from "./common/Typography";
+import { hasDuplicateIndicesInArray } from "../lib/utils/validators/restrict-duplications-in-array";
+import { compact } from "lodash";
 
 type TLotterySimulationFormProps = {
   latestDraw: DrawResult | null;
@@ -47,6 +50,7 @@ export default function LotterySimulationForm({
   });
 
   const form = useForm({
+    canSubmitWhenInvalid: true,
     defaultValues: {
       winningNumbers: Array(5).fill(null) as (number | null)[],
       yourNumbers: Array(5).fill(null) as (number | null)[],
@@ -94,73 +98,98 @@ export default function LotterySimulationForm({
         form.handleSubmit();
       }}
     >
-      <div className="grid grid-cols-[max-content_1fr] gap-4 max-w-98.5 w-full lg:gap-y-6">
-        <form.Field name="winningNumbers">
-          {(field) => (
-            <LotteryNumbersPicker
-              label="Winning numbers:"
-              value={field.state.value}
-              onChange={field.handleChange}
-              readonly
-            />
-          )}
-        </form.Field>
+      <fieldset>
+        <Typography as="legend" className="sr-only">
+          Lottery Simulation form
+        </Typography>
+        <div className="grid grid-cols-[max-content_1fr] gap-4 max-w-98.5 w-full lg:gap-6">
+          <form.Field name="winningNumbers">
+            {(field) => (
+              <LotteryNumbersPicker
+                label="Winning numbers:"
+                value={field.state.value}
+                onChange={field.handleChange}
+                readonly
+              />
+            )}
+          </form.Field>
 
-        <form.Field name="yourNumbers">
-          {(field) => (
-            <LotteryNumbersPicker
-              label="Your numbers:"
-              value={field.state.value}
-              onChange={field.handleChange}
-              readonly={createSession.isPending || isRunning}
-            />
-          )}
-        </form.Field>
-      </div>
+          <form.Field
+            name="yourNumbers"
+            validators={{
+              onSubmit: ({ value }) => {
+                if (form.getFieldValue("playWithRandomNumbers") === true)
+                  return undefined;
 
-      <Spacing size="md" />
+                if (hasDuplicateIndicesInArray(value))
+                  return "Numbers must be unique";
 
-      <div className="flex gap-4">
-        <p className="my-auto font-bold text-xs lg:text-sm lg:font-normal">
-          Play with random numbers:
-        </p>
-        <form.Field name="playWithRandomNumbers">
-          {(field) => (
-            <Checkbox
-              disabled={createSession.isPending || isRunning}
-              checked={field.state.value}
-              onChange={field.handleChange}
-            />
-          )}
-        </form.Field>
-      </div>
+                if (compact(value).length !== 5)
+                  return "Please enter 5 numbers";
 
-      <Spacing size="md" />
-
-      <label className="my-auto font-bold text-xs lg:text-sm lg:font-normal">
-        Speed:
+                return undefined;
+              },
+            }}
+          >
+            {(field) => (
+              <LotteryNumbersPicker
+                label="Your numbers:"
+                value={field.state.value}
+                onChange={field.handleChange}
+                readonly={createSession.isPending || isRunning}
+                isValid={field.state.meta.isValid}
+                errorMessage={field.state.meta.errors?.[0]}
+              />
+            )}
+          </form.Field>
+        </div>
         <Spacing size="md" />
-        <form.Field name="speed">
-          {(field) => (
-            <RangeInput
-              min={10}
-              max={1000}
-              step={10}
-              value={field.state.value}
-              onChange={field.handleChange}
-              onChangeCommitted={(speedMs) => {
-                if (sessionId && isRunning) {
-                  updateSpeed.mutate({ id: sessionId, speedMs });
-                }
-              }}
-            />
-          )}
-        </form.Field>
-      </label>
-      <Spacing size="lg" />
-      <Button className="mt-4" type="submit" disabled={isRunning}>
-        {isRunning ? "Running..." : "Start simulation"}
-      </Button>
+        <div className="flex gap-4">
+          <Typography
+            htmlFor="playWithRandomNumbers"
+            as="label"
+            className="my-auto"
+          >
+            Play with random numbers:
+          </Typography>
+          <form.Field name="playWithRandomNumbers">
+            {(field) => (
+              <Checkbox
+                id="playWithRandomNumbers"
+                disabled={createSession.isPending || isRunning}
+                checked={field.state.value}
+                onChange={field.handleChange}
+              />
+            )}
+          </form.Field>
+        </div>
+        <Spacing size="md" />
+        <Typography as="label" className="my-auto">
+          Speed:
+          <Spacing size="md" />
+          <form.Field name="speed">
+            {(field) => (
+              <RangeInput
+                min={10}
+                max={1000}
+                step={10}
+                value={field.state.value}
+                onChange={field.handleChange}
+                onChangeCommitted={(speedMs) => {
+                  if (sessionId && isRunning) {
+                    updateSpeed.mutate({ id: sessionId, speedMs });
+                  }
+                }}
+              />
+            )}
+          </form.Field>
+        </Typography>
+        <Spacing size="lg" />
+
+        <Button className="mt-4" type="submit" disabled={isRunning}>
+          {isRunning ? "Running..." : "Start simulation"}
+        </Button>
+      </fieldset>
     </form>
   );
 }
