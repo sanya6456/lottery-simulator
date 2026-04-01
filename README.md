@@ -44,6 +44,12 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up --build
 
 pgAdmin is disabled in production by default.
 
+### 4. Run migrations
+
+```bash
+DB_HOST=localhost pnpm migration:run
+```
+
 ### Useful commands
 
 ```bash
