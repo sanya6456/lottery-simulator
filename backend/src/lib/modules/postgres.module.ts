@@ -19,7 +19,7 @@ export const PG_DATA_SOURCE = 'PG_DATA_SOURCE';
           database: config.getOrThrow('DB_NAME'),
           entities: [__dirname + '/../**/*.entity{.ts,.js}'],
           migrations: [__dirname + '/../migrations/*{.ts,.js}'],
-          synchronize: config.get('NODE_ENV') === 'development',
+          synchronize: false,
         });
 
         return dataSource.initialize();

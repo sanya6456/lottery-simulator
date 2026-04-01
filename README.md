@@ -58,6 +58,15 @@ docker-compose down
 
 # Stop and remove volumes (wipes database)
 docker-compose down -v
+
+# Generate migrations e.g.:
+DB_HOST=localhost pnpm migration:generate
+
+# Run migrations e.g.:
+DB_HOST=localhost pnpm migration:run
+
+# Rollback last migration
+DB_HOST=localhost pnpm migration:revert
 ```
 
 ## System Architecture
