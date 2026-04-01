@@ -27,8 +27,10 @@ type ControlMessage =
 export class SimulationService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SimulationService.name);
 
-  /** sessionId → interval handle (local to this instance) */
-  private readonly loops = new Map<string, NodeJS.Timeout>();
+  private readonly loops = new Map<
+    string,
+    { handle: NodeJS.Timeout; speedMs: number; active: boolean }
+  >();
 
   constructor(
     private readonly sessionsService: SessionsService,
@@ -95,22 +97,37 @@ export class SimulationService implements OnModuleInit, OnModuleDestroy {
   }
 
   private startLoop(sessionId: string, speedMs: number): void {
+    const state = {
+      handle: null as unknown as NodeJS.Timeout,
+      speedMs,
+      active: true,
+    };
+    this.loops.set(sessionId, state);
+
+    const schedule = () => {
+      state.handle = setTimeout(() => void tick(), state.speedMs);
+    };
+
     const tick = async () => {
+      if (!state.active) return;
       try {
         await this.runDraw(sessionId);
       } catch (err) {
         this.logger.error(`Draw error for session ${sessionId}`, err);
         this.stopLocal(sessionId);
+        return;
       }
+      if (state.active) schedule();
     };
-    const handle = setInterval(() => void tick(), speedMs);
-    this.loops.set(sessionId, handle);
+
+    schedule();
   }
 
   private stopLocal(sessionId: string): void {
-    const handle = this.loops.get(sessionId);
-    if (handle) {
-      clearInterval(handle);
+    const state = this.loops.get(sessionId);
+    if (state) {
+      state.active = false;
+      clearTimeout(state.handle);
       this.loops.delete(sessionId);
       void this.redis.del(winKey(sessionId));
       void this.redis.del(`session:loop:${sessionId}`);
@@ -119,22 +136,18 @@ export class SimulationService implements OnModuleInit, OnModuleDestroy {
   }
 
   private restartLoop(sessionId: string, speedMs: number): void {
-    const handle = this.loops.get(sessionId);
-    if (!handle) return;
-    clearInterval(handle);
-    this.startLoop(sessionId, speedMs);
+    const state = this.loops.get(sessionId);
+    if (!state) return;
+    state.speedMs = speedMs;
   }
 
   private async runDraw(sessionId: string): Promise<void> {
     const session = await this.sessionsService.findOneOrFail(sessionId);
 
-    // Guard: stop if session was ended externally (e.g. DELETE hit a different instance)
     if (session.status !== SessionStatus.RUNNING) {
       this.stopLocal(sessionId);
       return;
     }
-
-    const drawNumber = session.totalDraws + 1;
 
     const playerNumbers = session.useRandomNumbers
       ? drawUniqueNumbers()
@@ -143,7 +156,7 @@ export class SimulationService implements OnModuleInit, OnModuleDestroy {
     const drawnNumbers = drawUniqueNumbers();
     const hits = countHits(playerNumbers, drawnNumbers);
 
-    await this.sessionsService.incrementDraws(sessionId);
+    const drawNumber = await this.sessionsService.incrementDraws(sessionId);
 
     if (hits >= 2) {
       await this.sessionsService.saveWinningDraw({

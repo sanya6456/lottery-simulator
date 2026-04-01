@@ -9,7 +9,7 @@ import { SessionStatus } from '../lib/entities/session.entity';
 // Mock dependencies
 const mockSessionsService = {
   findOneOrFail: jest.fn(),
-  incrementDraws: jest.fn(),
+  incrementDraws: jest.fn().mockResolvedValue(1),
   saveWinningDraw: jest.fn(),
   end: jest.fn(),
 };
@@ -80,22 +80,22 @@ describe('SimulationService', () => {
     });
 
     it('should clear all loops on destroy', () => {
-      // Mock start loop implicitly by adding it to the Map
-      // To test this easily, we can spy on stopLocal via reflection or call start first.
-      service['loops'].set(
-        'session-1',
-        setTimeout(() => {}, 1000),
-      );
-      service['loops'].set(
-        'session-2',
-        setTimeout(() => {}, 1000),
-      );
+      service['loops'].set('session-1', {
+        handle: setTimeout(() => {}, 1000),
+        speedMs: 1000,
+        active: true,
+      });
+      service['loops'].set('session-2', {
+        handle: setTimeout(() => {}, 1000),
+        speedMs: 1000,
+        active: true,
+      });
 
-      const clearIntervalSpy = jest.spyOn(global, 'clearInterval');
+      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
 
       service.onModuleDestroy();
 
-      expect(clearIntervalSpy).toHaveBeenCalledTimes(2);
+      expect(clearTimeoutSpy).toHaveBeenCalledTimes(2);
       expect(mockRedisClient.del).toHaveBeenCalledWith('winCounts:session-1');
       expect(mockRedisClient.del).toHaveBeenCalledWith(
         'session:loop:session-1',
@@ -118,10 +118,11 @@ describe('SimulationService', () => {
 
     it('should abort if loop is already in local memory', async () => {
       mockRedisClient.set.mockResolvedValueOnce('OK');
-      service['loops'].set(
-        'session-1',
-        setTimeout(() => {}, 100),
-      ); // fake running loop
+      service['loops'].set('session-1', {
+        handle: setTimeout(() => {}, 100),
+        speedMs: 100,
+        active: true,
+      }); // fake running loop
 
       await service.start('session-1');
 
@@ -182,10 +183,11 @@ describe('SimulationService', () => {
       service.onModuleInit();
 
       // Inject a fake loop
-      service['loops'].set(
-        'session-1',
-        setInterval(() => {}, 1000),
-      );
+      service['loops'].set('session-1', {
+        handle: setTimeout(() => {}, 1000),
+        speedMs: 1000,
+        active: true,
+      });
       const stopSpy = jest.spyOn(service as any, 'stopLocal');
       const restartSpy = jest.spyOn(service as any, 'restartLoop');
 
@@ -203,16 +205,18 @@ describe('SimulationService', () => {
       );
       expect(stopSpy).toHaveBeenCalledWith('session-1');
 
-      // Speed update
-      service['loops'].set(
-        'session-1',
-        setInterval(() => {}, 1000),
-      ); // put back
+      // Speed update — restartLoop now just mutates speedMs on the existing state
+      service['loops'].set('session-1', {
+        handle: setTimeout(() => {}, 1000),
+        speedMs: 1000,
+        active: true,
+      }); // put back
       messageHandler(
         'session:control',
         '{"type":"speed","sessionId":"session-1","speedMs":500}',
       );
       expect(restartSpy).toHaveBeenCalledWith('session-1', 500);
+      expect(service['loops'].get('session-1')?.speedMs).toBe(500);
     });
   });
 
@@ -248,10 +252,8 @@ describe('SimulationService', () => {
         useRandomNumbers: false,
         playerNumbers: [1, 2, 3, 4, 5],
       });
+      mockSessionsService.incrementDraws.mockResolvedValueOnce(1);
 
-      // We spy on the random generator directly or mock countHits...
-      // Since they are private/local scoped, we let the real random run but we know how it interacts:
-      // We'll just run it and assert expectations against our mocks without caring for the random hit count
       await (service as any).runDraw('session-1');
 
       expect(mockSessionsService.incrementDraws).toHaveBeenCalledWith(
@@ -268,19 +270,20 @@ describe('SimulationService', () => {
     });
 
     it('should end session and stop loop if MAX_DRAWS is reached (expired)', async () => {
-      // Mocking 26000 draws
       mockSessionsService.findOneOrFail.mockResolvedValueOnce({
         id: 'session-max',
         status: SessionStatus.RUNNING,
         speedMs: 100,
-        totalDraws: 52 * 500, // 26000
         useRandomNumbers: true,
       });
+      // Simulate that the atomic increment returns exactly 26 000
+      mockSessionsService.incrementDraws.mockResolvedValueOnce(52 * 500);
 
-      service['loops'].set(
-        'session-max',
-        setTimeout(() => {}, 100),
-      ); // fake running loop
+      service['loops'].set('session-max', {
+        handle: setTimeout(() => {}, 100),
+        speedMs: 100,
+        active: true,
+      }); // fake running loop
 
       await (service as any).runDraw('session-max');
 

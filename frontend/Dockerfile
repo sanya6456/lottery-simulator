@@ -20,12 +20,15 @@ CMD ["npm", "run", "dev", "--", "--host"]
 # Stage 3: Build
 FROM base AS builder
 
+ENV VITE_API_URL=/api
+
 RUN npm run build
 
 # Stage 4: Production
 FROM nginx:alpine AS production
 
 COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

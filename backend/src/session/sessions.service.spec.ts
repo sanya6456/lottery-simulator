@@ -44,6 +44,7 @@ describe('SessionsService', () => {
             save: jest.fn(),
             findOneBy: jest.fn(),
             increment: jest.fn(),
+            createQueryBuilder: jest.fn(),
           },
         },
         {
@@ -209,19 +210,25 @@ describe('SessionsService', () => {
   });
 
   describe('incrementDraws', () => {
-    it('should call increment on the repository', async () => {
-      sessionRepository.increment.mockResolvedValue({
-        generatedMaps: [],
-        raw: [],
-      });
+    it('should atomically increment totalDraws and return the new value', async () => {
+      const mockRaw: Array<{ total_draws: number }> = [{ total_draws: 5 }];
+      const qb = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        returning: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ raw: mockRaw }),
+      };
+      sessionRepository.createQueryBuilder.mockReturnValue(qb as never);
 
-      await service.incrementDraws(SESSION_ID);
+      const result = await service.incrementDraws(SESSION_ID);
 
-      expect(sessionRepository.increment).toHaveBeenCalledWith(
-        { id: SESSION_ID },
-        'totalDraws',
-        1,
-      );
+      expect(result).toBe(5);
+      expect(qb.update).toHaveBeenCalled();
+      const setArg = qb.set.mock.calls[0][0] as { totalDraws: unknown };
+      expect(typeof setArg.totalDraws).toBe('function');
+      expect(qb.where).toHaveBeenCalledWith('id = :id', { id: SESSION_ID });
+      expect(qb.returning).toHaveBeenCalledWith('"total_draws"');
     });
   });
 

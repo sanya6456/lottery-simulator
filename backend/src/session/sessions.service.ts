@@ -46,8 +46,15 @@ export class SessionsService {
     return this.sessions.save(session);
   }
 
-  async incrementDraws(id: string): Promise<void> {
-    await this.sessions.increment({ id }, 'totalDraws', 1);
+  async incrementDraws(id: string): Promise<number> {
+    const result = await this.sessions
+      .createQueryBuilder()
+      .update()
+      .set({ totalDraws: () => '"total_draws" + 1' })
+      .where('id = :id', { id })
+      .returning('"total_draws"')
+      .execute();
+    return (result.raw as Array<{ total_draws: number }>)[0].total_draws;
   }
 
   getWinningDraws(sessionId: string): Promise<WinningDraw[]> {

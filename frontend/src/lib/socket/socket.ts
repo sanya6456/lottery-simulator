@@ -1,7 +1,8 @@
 import { io } from "socket.io-client";
 
-const SOCKET_URL = import.meta.env.VITE_API_URL as string;
+const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
+const socketServer = apiUrl?.startsWith("http") ? apiUrl : "";
 
-export const socket = io(SOCKET_URL, {
+export const socket = io(socketServer, {
   autoConnect: false,
 });
