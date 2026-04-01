@@ -59,3 +59,48 @@ docker-compose down
 # Stop and remove volumes (wipes database)
 docker-compose down -v
 ```
+
+## System Architecture
+
+### REST API Endpoints
+
+Swagger documentation is available at `http://localhost:3000/api` when the backend is running.
+
+### Lottery Draw Data Model
+
+![Lottery Draw Data Model](./docs/assets/lottery-draw-data-model.png)
+
+### Lottery Draw Flow Chart
+
+![Lottery Draw Flow Chart](./docs/assets/lottery-draw-flow-chart.png)
+
+### Decision Points
+
+#### Websocket
+
+- Real-time updates
+- Efficient for frequent data changes
+- Two-way communication (real time draw speed updates)
+
+#### Redis Pub/Sub
+
+- Decouples components
+- Supports multiple subscribers
+
+### Tests
+
+#### Backend
+
+**Unit tests for services and controllers**
+
+```bash
+cd backend && npm run test
+```
+
+#### Frontend
+
+**Unit tests**
+
+```bash
+cd frontend && npm run test:coverage
+```
